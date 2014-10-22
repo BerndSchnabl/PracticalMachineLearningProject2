@@ -6,7 +6,7 @@ output: html_document
 ---
 
 
-##- Data import and cleaning
+##- Data import and cleasning
 
 The training dataset contains many values that are not present, 
 these are either blank "", NA, or DIV/0.
@@ -58,7 +58,7 @@ corrplot(M, order="hclust", sig.level = 0.0051)
 ## Random Forest Model
 
 The downloaded training data set is divided into 2 partition based on the outcome variable "classe". 
-
+The train control object contains the 
 
 ```{r, echo=TRUE,warning=FALSE,message=FALSE}
 library(caret)
@@ -69,7 +69,8 @@ dsTraining_train <- dsTraining[inTrain,]
 dsTraining_test <- dsTraining[-inTrain,]
 
 TrainCtrlObj <- trainControl(
-               method = "cv", 
+               method = "cv", # cross validation for out of sample error prediction 
+               number = 10, # 10 forld cross validation
                repeats =  1,
                p = 0.75, 
                horizon = 1,
@@ -98,17 +99,17 @@ plot(varImp(fit.rf, scale = T),top=20)
 
 ## Predicting out of sample errors
 
-The calculation of the root mean square error on the training set delivers:
+The accuracy of the predictions from the training data is 0.992 as can be seen in 
+the random forest model: 
 ```{r, echo=TRUE,warning=FALSE,message=FALSE}
 
-predValues_train <- predict(fit.rf, newdata=dsTraining_train)
-cm_train <- confusionMatrix(predValues_train, factor(dsTraining_train$classe))
-cm_train
+fit.rf
 
 ```
 
 The accuracy of the ur of sample errors needs to be lower tham the 
-accuracy of the predictions on the training set.
+accuracy of the predictions on the training set. So we expect an accuracy below 0.992.
+The actual accuracy from the testing data (out of sample) is 0.991 and slightly lower as 0.992 as we expected.
 
 ```{r, echo=TRUE,warning=FALSE,message=FALSE}
 
