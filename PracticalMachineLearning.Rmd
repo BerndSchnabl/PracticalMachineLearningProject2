@@ -1,7 +1,7 @@
 ---
 title: "Practical Machine Learning"
 author: "Bernd Schnabl"
-date: "Tuesday, October 21, 2014"
+date: "Tuesday, October 22, 2014"
 output: html_document
 ---
 
