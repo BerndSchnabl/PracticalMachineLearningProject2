@@ -1,0 +1,129 @@
+---
+title: "Practical Machine Learning"
+author: "Bernd Schnabl"
+date: "Tuesday, October 21, 2014"
+output: html_document
+---
+
+
+##- Data import and cleaning
+
+The training dataset contains many values that are not present, 
+these are either blank "", NA, or DIV/0.
+While importing the raw csv files, these values are replaced with NA 
+and columns that contain at least one occurance of an NA values are removed in a second step. 
+
+A manual inspection of the data shows, that the first 7 columns contain data, which are not usable for predicting the outcome "classe". These columns are: "X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window".
+
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE}
+setwd("~/R/Coursera/DSSpec/assignments/C08-P01")
+
+read.dataset <- function( fn ) {
+  dsraw  <- read.csv(fn,header=T, strip.white=T, na.strings=c("NA","","DIV/0!"), sep=",")
+  dsraw[,8:ncol(dsraw)] ## remove the first 7 columns
+}
+
+dsTestingFull <- read.dataset("pml-testing.csv")
+dsTrainingFull <- read.dataset("pml-training.csv")
+
+validColumnsTr <- ! apply( dsTrainingFull , 2 , function(x) any(is.na(x)) )
+validColumnsTst <- ! apply( dsTestingFull , 2 , function(x) any(is.na(x)) )
+
+dsTraining <- dsTrainingFull[ , names( validColumnsTr[validColumnsTr==TRUE])]
+dsTesting  <- dsTestingFull[ , names( validColumnsTst[validColumnsTst==TRUE])]
+dim(dsTraining)
+
+```
+
+
+The variable to predict is the classe variable. This variable has 5 levels, where A is the best and E ist the least perfect conducted training.
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE}
+unique(dsTrainingFull$classe)
+```
+
+
+A correlation plot can be used to determine, if any features should be excluded, 
+since they have a perfect negative or positive correlation.
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE}
+library(corrplot)
+M <- cor(subset(dsTraining, select=-c(classe)))
+corrplot(M, order="hclust", sig.level = 0.0051)
+```
+
+
+
+## Random Forest Model
+
+The downloaded training data set is divided into 2 partition based on the outcome variable "classe". 
+
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE}
+library(caret)
+library(randomForest)
+
+inTrain <- createDataPartition(dsTraining$classe, p=0.7, list=F)
+dsTraining_train <- dsTraining[inTrain,]
+dsTraining_test <- dsTraining[-inTrain,]
+
+TrainCtrlObj <- trainControl(
+               method = "cv", 
+               repeats =  1,
+               p = 0.75, 
+               horizon = 1,
+               returnData = TRUE,
+               summaryFunction = defaultSummary,
+               selectionFunction = "best",
+               allowParallel = TRUE)
+
+fit.rf <- train(
+      classe ~ ., # predict classe wird all features
+      data=dsTraining_train,
+      method = "rf", # random forest
+      preProcess = c("center", "scale", "knnImpute"), # principle component analysis "pca"
+      #metric = ifelse(is.factor(y), "Accuracy", "RMSE"),   
+      #maximize = ifelse(metric == "RMSE", FALSE, TRUE),
+      trControl = TrainCtrlObj) ## from TrainControl
+
+```
+
+
+## Print the importance of the variables
+```{r, echo=TRUE,warning=FALSE,message=FALSE}
+plot(varImp(fit.rf, scale = T),top=20)
+```
+(Knitr does not correctly display the variable names. The separately created plot does show the correct names on the 20 most relevant features)
+
+## Predicting out of sample errors
+
+The calculation of the root mean square error on the training set delivers:
+```{r, echo=TRUE,warning=FALSE,message=FALSE}
+
+predValues_train <- predict(fit.rf, newdata=dsTraining_train)
+cm_train <- confusionMatrix(predValues_train, factor(dsTraining_train$classe))
+cm_train
+
+```
+
+The accuracy of the ur of sample errors needs to be lower tham the 
+accuracy of the predictions on the training set.
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE}
+
+predValues_test <- predict(fit.rf, newdata=dsTraining_test)
+cm_test <- confusionMatrix(predValues_test, factor(dsTraining_test$classe))
+cm_test
+
+```
+
+## Predicting the Results 
+
+The predictions on the testing dataset with the 20 samples based on the random forest model delivers these results
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE}
+res <- predict(fit.rf, dsTesting)
+res
+```
+
